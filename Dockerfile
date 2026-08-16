@@ -1,4 +1,4 @@
-# DeerFlow Backend with debug helper for Render
+# DeerFlow Backend for Render - Direct venv activation
 FROM python:3.12-slim-bookworm
 
 ENV LANG=C.UTF-8

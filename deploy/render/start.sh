@@ -1,42 +1,46 @@
 #!/bin/sh
-set -e
-
 PORT=${PORT:-10000}
 LOGFILE=/app/debug.log
 
-echo "=== DeerFlow Backend Startup ===" > $LOGFILE
+echo "=== Startup Debug ===" > $LOGFILE
 echo "PORT=$PORT" >> $LOGFILE
-echo "Working dir: $(pwd)" >> $LOGFILE
-echo "Python: $(python3 --version)" >> $LOGFILE
+echo "PWD=$(pwd)" >> $LOGFILE
+echo "Python=$(python3 --version 2>&1)" >> $LOGFILE
+echo "Files in /app/backend:" >> $LOGFILE
+ls /app/backend/ >> $LOGFILE 2>&1
+echo "Venv check:" >> $LOGFILE
+ls /app/backend/.venv/bin/python 2>&1 >> $LOGFILE
 echo "" >> $LOGFILE
 
-# Start gateway in background, capture output
+# Try to start gateway and capture ALL output
 cd /app/backend
-PYTHONPATH=. uv run --no-sync uvicorn app.gateway.app:app --host 0.0.0.0 --port $PORT >> $LOGFILE 2>&1 &
-GATEWAY_PID=$!
+PYTHONPATH=. /app/backend/.venv/bin/python -m uvicorn app.gateway.app:app --host 0.0.0.0 --port $PORT >> $LOGFILE 2>&1 &
+PID=$!
 
-# Wait a moment then check if it's running
-sleep 5
-if kill -0 $GATEWAY_PID 2>/dev/null; then
-    echo "Gateway started successfully (PID=$GATEWAY_PID)" >> $LOGFILE
-    wait $GATEWAY_PID
+# Give it time to start or crash
+sleep 8
+
+if kill -0 $PID 2>/dev/null; then
+    echo "Gateway running PID=$PID" >> $LOGFILE
+    wait $PID
 else
-    echo "Gateway FAILED to start!" >> $LOGFILE
-    # Serve the log file via HTTP so we can debug
-    cd /app
-    python3 -c "
-import http.server
-import os
+    echo "Gateway crashed!" >> $LOGFILE
+fi
+
+# If we get here, serve the log
+cd /app
+python3 -c "
+import http.server, os
 port = int(os.environ.get('PORT', '10000'))
 class H(http.server.BaseHTTPRequestHandler):
     def do_GET(self):
         self.send_response(200)
-        self.send_header('Content-Type', 'text/plain')
+        self.send_header('Content-Type', 'text/plain; charset=utf-8')
         self.end_headers()
-        with open('$LOGFILE') as f:
-            self.wfile.write(f.read().encode())
+        try:
+            with open('/app/debug.log') as f:
+                self.wfile.write(f.read().encode())
+        except: self.wfile.write(b'No log file')
     def log_message(self, *a): pass
 http.server.HTTPServer(('0.0.0.0', port), H).serve_forever()
-" &
-    wait
-fi
+"

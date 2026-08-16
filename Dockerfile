@@ -1,4 +1,4 @@
-# DeerFlow Backend-Only for Render (Free Plan Compatible)
+# DeerFlow Backend with debug helper for Render
 FROM python:3.12-slim-bookworm
 
 ENV LANG=C.UTF-8
@@ -14,17 +14,15 @@ RUN pip install --no-cache-dir uv
 
 WORKDIR /app
 
-# Copy backend source
 COPY backend/ ./backend/
 COPY skills/ ./skills/
 COPY config.render.yaml ./backend/config.yaml
 COPY extensions_config.json ./backend/extensions_config.json
 
-# Install dependencies
-RUN cd /app/backend && uv sync --extra redis --no-dev
+RUN cd /app/backend && uv sync --extra redis --no-dev && mkdir -p /app/backend/.deer-flow
 
-RUN mkdir -p /app/backend/.deer-flow
+COPY deploy/render/start.sh /start.sh
+RUN chmod +x /start.sh
 
 EXPOSE 10000
-
-CMD ["sh", "-c", "cd /app/backend && PYTHONPATH=. uv run --no-sync uvicorn app.gateway.app:app --host 0.0.0.0 --port ${PORT:-10000}"]
+CMD ["/start.sh"]

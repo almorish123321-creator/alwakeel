@@ -1,4 +1,4 @@
-# Minimal DeerFlow config for Render deployment
+# DeerFlow config for Render deployment
 config_version: 34
 log_level: info
 
@@ -17,6 +17,7 @@ models:
 
 sandbox:
   type: none
+  use: none
 
 memory:
   enabled: false

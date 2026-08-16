@@ -11,9 +11,8 @@ __pycache__/
 .venv/
 venv/
 
-# Node.js (will be rebuilt in container)
+# Node.js runtime modules (installed in container)
 node_modules
-.next
 
 # IDE
 .idea/

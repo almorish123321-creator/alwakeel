@@ -280,7 +280,7 @@ async function sendMessage() {
         input: {
           messages: [{ role: 'user', content: text }]
         },
-        stream_mode: ['messages'],
+        stream_mode: ['values'],
         on_disconnect: 'cancel'
       })
     });
@@ -288,7 +288,7 @@ async function sendMessage() {
     if (!res.ok) {
       removeTyping();
       const errText = await res.text().catch(() => '');
-      showError('خطأ من الخادم (' + res.status + '): ' + errText.substring(0, 200));
+      showError('خطأ من الخادم (' + res.status + '): ' + errText.substring(0, 300));
       setLoading(false);
       return;
     }
@@ -296,6 +296,7 @@ async function sendMessage() {
     removeTyping();
     const aiBubble = addMessage('ai', '');
     let fullText = '';
+    let currentEvent = '';
 
     const reader = res.body.getReader();
     const decoder = new TextDecoder();
@@ -310,36 +311,30 @@ async function sendMessage() {
       buffer = lines.pop() || '';
 
       for (const line of lines) {
+        // Track event type (event: values, event: metadata, etc.)
+        if (line.startsWith('event: ')) {
+          currentEvent = line.slice(7).trim();
+          continue;
+        }
+        // Skip non-data lines
         if (!line.startsWith('data: ')) continue;
         const data = line.slice(6).trim();
         if (data === '[DONE]') continue;
 
         try {
           const parsed = JSON.parse(data);
-          // Handle different SSE event types
-          if (parsed.type === 'messages/partial') {
-            const chunk = parsed.content || '';
-            fullText += chunk;
-            aiBubble.innerHTML = formatMarkdown(fullText);
-            messagesEl.scrollTop = messagesEl.scrollHeight;
-          } else if (parsed.event === 'messages/partial' || parsed.event === 'messages/complete') {
-            if (parsed.data?.content) {
-              fullText = parsed.data.content;
+
+          // DeerFlow sends "values" events with full messages array
+          if (currentEvent === 'values' && parsed.messages) {
+            // Find the last AI message in the array
+            const aiMsg = [...parsed.messages].reverse().find(m => m.type === 'ai');
+            if (aiMsg && aiMsg.content) {
+              fullText = aiMsg.content;
               aiBubble.innerHTML = formatMarkdown(fullText);
               messagesEl.scrollTop = messagesEl.scrollHeight;
             }
           }
-        } catch (e) {
-          // Try alternate SSE format - some events might have different structure
-          try {
-            const parsed = JSON.parse(data);
-            if (parsed.content !== undefined) {
-              fullText += parsed.content;
-              aiBubble.innerHTML = formatMarkdown(fullText);
-              messagesEl.scrollTop = messagesEl.scrollHeight;
-            }
-          } catch(e2) { /* skip unparseable lines */ }
-        }
+        } catch (e) { /* skip */ }
       }
     }
 

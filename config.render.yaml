@@ -2,6 +2,10 @@
 config_version: 34
 log_level: info
 
+database:
+  backend: sqlite
+  sqlite_dir: /app/backend/.deer-flow/data
+
 models:
   - name: gpt-4o-mini
     display_name: GPT-4o Mini
